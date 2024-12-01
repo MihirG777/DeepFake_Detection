@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepFake Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1000px; }
+        .preview-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            min-height: 300px;
+            background-color: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #preview {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 4px;
+            display: none;
+        }
+        #video-preview {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            background-color: #000;
+            border-radius: 4px;
+            display: none;
+            margin: 0 auto;
+        }
+        .preview-placeholder {
+            text-align: center;
+            color: #6c757d;
+            margin: 20px 0;
+            display: block;
+        }
+        .preview-placeholder i {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .result-box {
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+            padding: 10px;
+            background-color: #fff;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .result-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result-details {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: rgba(255,255,255,0.9);
+        }
+        #preview-error {
+            display: none;
+            color: #dc3545;
+            margin-top: 10px;
+            text-align: center;
+            padding: 10px;
+            background-color: #ffe6e6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">DeepFake Detection</h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <form id="upload-form" class="mb-3">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Choose an image or video file</label>
+                        <input type="file" class="form-control" id="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/webm,image/png,image/jpeg,image/jpg" required>
+                        <div class="file-info mt-2" id="file-info"></div>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary">Detect DeepFake</button>
+                    </div>
+                </form>
+
+                <div class="preview-container">
+                    <div class="preview-placeholder" id="preview-placeholder">
+                        <i class="bi bi-file-earmark-image"></i>
+                        <div>No file selected</div>
+                        <div class="small text-muted">Supported formats: JPG, PNG, MP4</div>
+                    </div>
+                    <img id="preview" alt="Preview">
+                    <video id="video-preview" controls playsinline preload="metadata">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div id="preview-error"></div>
+                </div>
+
+                <div class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing file...</p>
+                </div>
+
+                <div id="result" class="result-box">
+                    <h4 class="text-center mb-3">Detection Result</h4>
+                    <div id="result-content"></div>
+                </div>
+
+                <div id="analysisResults" class="mt-4 d-none">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Comprehensive Analysis Results</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Main Prediction -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="alert" id="predictionAlert">
+                                        <h4 class="prediction-result mb-2"></h4>
+                                        <div class="confidence-score"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Technical Analysis -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="analysis-section">
+                                        <h6 class="text-primary">Technical Analysis</h6>
+                                        <ul class="technical-list list-unstyled"></ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="analysis-section">
+                                        <h6 class="text-primary">Visual Indicators</h6>
+                                        <ul class="visual-list list-unstyled"></ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Advanced Analysis -->
+                            <div class="row mt-4">
+                                <div class="col-md-4">
+                                    <div class="analysis-section">
+                                        <h6 class="text-primary">Frequency Analysis</h6>
+                                        <ul class="frequency-list list-unstyled"></ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="analysis-section">
+                                        <h6 class="text-primary">Compression Analysis</h6>
+                                        <ul class="compression-list list-unstyled"></ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="analysis-section">
+                                        <h6 class="text-primary">Color Analysis</h6>
+                                        <ul class="color-list list-unstyled"></ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Raw Metrics -->
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <button class="btn btn-outline-primary" type="button" data-toggle="collapse" data-target="#rawMetrics">
+                                        Show Raw Metrics
+                                    </button>
+                                    <div class="collapse mt-2" id="rawMetrics">
+                                        <div class="card card-body">
+                                            <pre class="raw-metrics"></pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script>
+            const form = document.getElementById('upload-form');
+            const fileInput = document.getElementById('file');
+            const preview = document.getElementById('preview');
+            const videoPreview = document.getElementById('video-preview');
+            const loading = document.querySelector('.loading');
+            const result = document.getElementById('result');
+            const resultContent = document.getElementById('result-content');
+            const fileInfo = document.getElementById('file-info');
+            const previewError = document.getElementById('preview-error');
+            const previewPlaceholder = document.getElementById('preview-placeholder');
+
+            const supportedTypes = {
+                'image/jpeg': true,
+                'image/jpg': true,
+                'image/png': true,
+                'video/mp4': true,
+                'video/webm': true,
+                'video/quicktime': true,
+                'video/x-msvideo': true,
+                'video/avi': true,
+                'video/msvideo': true,
+                'application/octet-stream': true // For some MP4 files
+            };
+
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            function showError(message, details = '') {
+                console.error('[Error]', message, details);
+                previewError.innerHTML = `
+                    <div class="fw-bold">${message}</div>
+                    ${details ? `<div class="small mt-1">${details}</div>` : ''}
+                `;
+                previewError.style.display = 'block';
+            }
+
+            function resetPreviews() {
+                if (videoPreview.src) {
+                    videoPreview.pause();
+                    videoPreview.removeAttribute('src');
+                    videoPreview.load();
+                }
+                preview.src = '';
+                previewError.style.display = 'none';
+                preview.style.display = 'none';
+                videoPreview.style.display = 'none';
+                previewPlaceholder.style.display = 'block';
+            }
+
+            function showPreview(type) {
+                previewPlaceholder.style.display = 'none';
+                if (type === 'image') {
+                    preview.style.display = 'block';
+                    videoPreview.style.display = 'none';
+                } else if (type === 'video') {
+                    preview.style.display = 'none';
+                    videoPreview.style.display = 'block';
+                }
+            }
+
+            async function handleVideoFile(file) {
+                try {
+                    // First transcode the video
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const response = await fetch('/process_video', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to process video');
+                    }
+
+                    if (!data.preview_url) {
+                        throw new Error('No preview URL received');
+                    }
+
+                    console.log('Video processed:', data);
+
+                    // Set up video preview with transcoded video
+                    videoPreview.src = data.preview_url;
+                    
+                    videoPreview.onerror = (e) => {
+                        console.error('Video preview error:', e);
+                        showError('Error loading video preview', 'The video might be corrupted');
+                    };
+
+                    videoPreview.onloadedmetadata = () => {
+                        console.log('Video metadata loaded:', {
+                            duration: videoPreview.duration,
+                            size: `${videoPreview.videoWidth}x${videoPreview.videoHeight}`
+                        });
+                        showPreview('video');
+                    };
+
+                    videoPreview.load();
+                    
+                    fileInfo.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${file.name}</strong>
+                                <div class="small text-muted">
+                                    Type: ${file.type || 'video/mp4'}<br>
+                                    Size: ${formatFileSize(file.size)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } catch (error) {
+                    console.error('Video handling error:', error);
+                    showError('Error processing video', error.message);
+                }
+            }
+
+            fileInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                console.log('File selected:', {
+                    name: file.name,
+                    type: file.type,
+                    size: file.size
+                });
+
+                resetPreviews();
+
+                // Handle different file types
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        preview.src = e.target.result;
+                        showPreview('image');
+                        fileInfo.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${file.name}</strong>
+                                    <div class="small text-muted">
+                                        Type: ${file.type}<br>
+                                        Size: ${formatFileSize(file.size)}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    };
+                    reader.onerror = () => showError('Error reading image file');
+                    reader.readAsDataURL(file);
+                } else if (file.type.startsWith('video/') || file.type === 'application/octet-stream') {
+                    await handleVideoFile(file);
+                } else {
+                    showError('Unsupported file type', `Please use JPG, PNG, or MP4 files. Received: ${file.type}`);
+                }
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const file = fileInput.files[0];
+                if (!file) return;
+
+                loading.style.display = 'block';
+                result.style.display = 'none';
+                console.log('Submitting file:', file.name, 'Type:', file.type);
+
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    console.log('Sending request to detect endpoint...');
+                    const response = await fetch('/detect', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    console.log('Response status:', response.status);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Error response:', errorText);
+                        let errorMessage;
+                        try {
+                            const errorData = JSON.parse(errorText);
+                            errorMessage = errorData.details || errorData.error || 'Detection failed';
+                        } catch {
+                            errorMessage = errorText || 'Detection failed';
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    const data = await response.json();
+                    console.log('Response data:', data);
+                    
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    result.className = 'result-box alert ' + (data.is_fake ? 'alert-danger' : 'alert-success');
+                    resultContent.innerHTML = `
+                        <div class="result-details text-center">
+                            <h5 class="mb-3">${data.is_video ? 'Video Analysis' : 'Image Analysis'}</h5>
+                            <p class="mb-2"><strong>Result:</strong> ${data.is_fake ? 'Fake' : 'Real'}</p>
+                            <p class="mb-3"><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(2)}%</p>
+                        </div>
+                        <div class="text-center">
+                            <img src="${data.annotated_image}" 
+                                 alt="Analyzed ${data.is_video ? 'Video Frame' : 'Image'}" 
+                                 class="result-image"
+                                 onerror="this.onerror=null; this.src=''; console.error('Error loading analyzed image');">
+                        </div>
+                    `;
+
+                    displayAnalysisResults(data);
+                } catch (error) {
+                    console.error('Error during detection:', error);
+                    result.className = 'result-box alert alert-danger';
+                    resultContent.innerHTML = `
+                        <div class="text-center">
+                            <p class="mb-0">Error: ${error.message}</p>
+                        </div>
+                    `;
+                } finally {
+                    loading.style.display = 'none';
+                    result.style.display = 'block';
+                }
+            });
+
+            function displayAnalysisResults(results) {
+                const analysisResults = document.getElementById('analysisResults');
+                
+                if (!results || !analysisResults) {
+                    console.warn('Missing results or analysisResults element');
+                    return;
+                }
+
+                try {
+                    // Show the analysis results section
+                    analysisResults.classList.remove('d-none');
+                    
+                    // Calculate confidence level category
+                    let confidenceLevel = '';
+                    const confidence = results.confidence * 100;
+                    if (confidence >= 90) confidenceLevel = 'Very High';
+                    else if (confidence >= 70) confidenceLevel = 'High';
+                    else if (confidence >= 50) confidenceLevel = 'Moderate';
+                    else if (confidence >= 30) confidenceLevel = 'Low';
+                    else confidenceLevel = 'Very Low';
+
+                    // Create video preview section if available
+                    let previewSection = '';
+                    if (results.is_video && results.preview_url) {
+                        previewSection = `
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Video Preview</h6>
+                                </div>
+                                <div class="card-body">
+                                    <video class="w-100" controls preload="metadata">
+                                        <source src="${results.preview_url}" type="video/mp4">
+                                        Your browser does not support the video tag.
+                                    </video>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // Update the content with detailed explanations
+                    const content = `
+                        ${previewSection}
+                        <div class="card">
+                            <div class="card-header bg-${results.is_fake ? 'danger' : 'success'} text-white">
+                                <h5 class="mb-0">Analysis Results</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <h6 class="mb-3">Detection Results</h6>
+                                        <div class="list-group mb-4">
+                                            <div class="list-group-item">
+                                                <h6 class="mb-1"><strong>Verdict:</strong> ${results.is_fake ? 'FAKE DETECTED' : 'REAL MEDIA'}</h6>
+                                                <p class="mb-1 text-muted">
+                                                    ${results.is_fake ? 
+                                                        'Our AI model has identified this media as potentially manipulated or artificially generated.' :
+                                                        'Our analysis suggests this media is likely authentic and has not been artificially manipulated.'}
+                                                </p>
+                                            </div>
+                                            <div class="list-group-item">
+                                                <h6 class="mb-1"><strong>Confidence:</strong> ${confidence.toFixed(2)}% (${confidenceLevel})</h6>
+                                                <p class="mb-1 text-muted">
+                                                    This indicates the model's level of certainty in its verdict. 
+                                                    ${confidence >= 70 ? 
+                                                        'A high confidence score suggests strong evidence supporting the verdict.' :
+                                                        confidence >= 50 ?
+                                                        'A moderate confidence score indicates some uncertainty in the analysis.' :
+                                                        'A lower confidence score suggests the need for additional verification.'}
+                                                </p>
+                                            </div>
+                                            <div class="list-group-item">
+                                                <h6 class="mb-1"><strong>Media Type:</strong> ${results.is_video ? 'Video' : 'Image'}</h6>
+                                                <p class="mb-1 text-muted">
+                                                    ${results.is_video ? 
+                                                        'Video analysis examines multiple frames for temporal consistency and manipulation artifacts.' :
+                                                        'Image analysis focuses on spatial patterns, inconsistencies, and digital manipulation traces.'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="alert alert-info">
+                                            <h6 class="alert-heading">Understanding the Results</h6>
+                                            <p class="mb-0">Our deepfake detection system uses advanced AI to analyze various aspects of the media, including facial features, 
+                                            lighting patterns, and digital artifacts. While our model is highly accurate, it's essential to note that no detection system 
+                                            is perfect, and results should be considered alongside other verification methods.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    analysisResults.innerHTML = content;
+
+                    // Add error handler for video loading
+                    if (results.is_video && results.preview_url) {
+                        const video = analysisResults.querySelector('video');
+                        video.onerror = function() {
+                            console.error('Error loading video:', results.preview_url);
+                            video.parentElement.innerHTML = `
+                                <div class="alert alert-warning">
+                                    <strong>Error:</strong> Unable to load video preview. The file may be corrupted or in an unsupported format.
+                                </div>
+                            `;
+                        };
+                    }
+                } catch (error) {
+                    console.error('Error displaying analysis results:', error);
+                    analysisResults.innerHTML = `
+                        <div class="alert alert-warning">
+                            <strong>Note:</strong> Some analysis details could not be displayed.
+                        </div>
+                    `;
+                }
+            }
+        </script>
+    </body>
+</html>
